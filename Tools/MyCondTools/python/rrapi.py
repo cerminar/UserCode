@@ -1,4 +1,4 @@
-import urllib, re, simplejson as json, socket
+import urllib, re, json as json, socket
 
 """
 Python object that enables connection to RR v3 API.
@@ -107,9 +107,7 @@ class RRApi:
             rdata = resp.read()
             if re.search("json", resp.info().gettype()):
                 try:
-                    #print rdata
-                    return json.loads(rdata, strict=False)
-                    #return json.loads(rdata)
+                    return json.loads(rdata)
                 except TypeError, e:
                     self.dprint(e)
                     return rdata
