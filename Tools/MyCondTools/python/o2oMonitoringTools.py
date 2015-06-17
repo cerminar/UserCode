@@ -4,7 +4,7 @@ import os
 import Tools.MyCondTools.RunInfo as RunInfo
 import Tools.MyCondTools.tableWriter as tableWriter
 import Tools.MyCondTools.color_tools as colorTools
-import Tools.MyCondTools.gt_tools as gtTools
+#import Tools.MyCondTools.gt_tools as gtTools
 
 
 
@@ -70,7 +70,6 @@ class RecordReport:
         self._properties = {}
         self._properties['recordName'] = recordname
         self._properties['tagName'] = None
-        self._properties['accountName'] = None
         self._properties['lastWrite'] = None
         self._properties['lastWriteAge'] = None
         self._properties['lastWriteStatus'] = None
@@ -111,9 +110,8 @@ class RecordReport:
         self._properties['lastSinceStatus'] = status
 
 
-    def setTagAndAccount(self, tag, account):
+    def setTagName(self, tag):
         self._properties['tagName'] = tag
-        self._properties['accountName'] = account
 
 
 
