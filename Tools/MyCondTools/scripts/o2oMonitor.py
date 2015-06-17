@@ -16,7 +16,8 @@ import shutil
 
 import Tools.MyCondTools.monitorStatus as monitorStatus
 import Tools.MyCondTools.tier0WMADasInterface as tier0DasInterface
-import Tools.MyCondTools.gt_tools as gtTools
+import Tools.MyCondTools.gtTools as gtTools
+import Tools.MyCondTools.dbTools as dbTools
 import Tools.MyCondTools.o2oMonitoringTools as o2oMonitoringTools
 import Tools.MyCondTools.RunRegistryTools as RunRegistryTools
 import Tools.MyCondTools.popcon_monitoring_last_updates as popConLog
@@ -25,6 +26,8 @@ import Tools.MyCondTools.RunInfo as RunInfo
 import Tools.MyCondTools.tableWriter as tableWriter
 import ConfigParser as ConfigParser
 #from ConfigParser import ConfigParser
+
+
 
 
 
@@ -52,6 +55,7 @@ rrRunClassName              = cfgfile.get('O2OMonitor','rrRunClassName')
 o2oLogfileList              = cfgfile.get('O2OMonitor','o2oLogfileList')
 thresholdLastWrite          = cfgfile.get('O2OMonitor','thresholdLastWrite')
 thresholdLastSince          = cfgfile.get('O2OMonitor','thresholdLastSince')
+firstMonitoredRun           = int(cfgfile.get('O2OMonitor','firstMonitoredRun'))
 
 def runBackEnd():
 
@@ -61,32 +65,25 @@ def runBackEnd():
     unknownRun = False
     unknownRunMsg = ""
 
+    gtName = ''
     tier0Das = tier0DasInterface.Tier0DasInterface(tier0DasSrc) 
     try:
         nextPromptRecoRun = tier0Das.firstConditionSafeRun()
         print "Tier0 DAS next run for prompt reco:",nextPromptRecoRun
-        gtFromPrompt = tier0Das.promptGlobalTag(referenceDataset)
-        print "      GT for dataset: ", referenceDataset, "run:", str(nextPromptRecoRun), ":", gtFromPrompt
+        gtName = tier0Das.promptGlobalTag(referenceDataset)
+        print "      GT for dataset: ", referenceDataset, "run:", str(nextPromptRecoRun), ":", gtName
     except Exception as error:
         print '*** Error: Tier0-DAS query has failed'
         print error
         return 102, "Error: Tier0-DAS query has failed: " + str(error)
 
-    print len(gtFromPrompt) 
-    if(len(gtFromPrompt) == 0):
-        return 202, "No " + referenceDataset + " datset for run: " + str(nextPromptRecoRun) + " -> failed to get the GT name"
-    gtName = gtFromPrompt.split('::')[0]
-    gtConfFile = gtName + '.conf'
-
     
-    if not gtTools.confFileFromDB(gtName, gtConfFile, gtconnstring, passwdfile):
-        return 201, "GT: " + gtFromPrompt + " could not be found in ORACLE!"
+    
     
 
     # create the collection of tags
-    tagCollection = gtTools.GTEntryCollection()
-    gtTools.fillGTCollection(gtName+'.conf', gtName, tagCollection)
-    
+    tagCollection = gtTools.getGTCollection(gtName)
+
     tagsTomonitor = []
 
     print "Tags to be monitored: "
@@ -97,7 +94,7 @@ def runBackEnd():
             record = record.split(':')[0]
         rcdId =  gtTools.RcdID([record, label])
         if not tagCollection.hasRcdID(rcdId):
-            print "Error: rcd: " + rcdIdn + " not found in GT: " + gtName
+            print "Error: rcd: " + str(rcdId) + " not found in GT: " + gtName
         else:
             print '   ', tagCollection.getByRcdID(rcdId)
             tagsTomonitor.append(tagCollection.getByRcdID(rcdId))
@@ -116,7 +113,7 @@ def runBackEnd():
     if len(cachedRuns) != 0:
         cachedRuns.sort()
     else:
-        cachedRuns.append(1)
+        cachedRuns.append(firstMonitoredRun)
 
     lastCachedRun = cachedRuns[len(cachedRuns)-1]
     #lastCachedRun = 191419
@@ -154,17 +151,17 @@ def runBackEnd():
     for entry in tagsTomonitor:
         print "- Tag:", entry
         
-        tagName = entry.tagName()
-        accountName = entry.account()
-        recordName = entry.record()
+        tagName = entry.tag_name
 
+        recordName = entry.record
+        accountName = 'CMS_CONDITIONS'
         tableTitle.append(recordName)
 
         # create the report for this given record
         rcdRep = o2oMonitoringTools.RecordReport(recordName)
-        rcdRep.setTagAndAccount(tagName, accountName)
+        rcdRep.setTagName(tagName)
 
-
+        
         nDays = 1
         nSec = nDays*24*60*60
         popLog = popConLog.PopCon_Monitoring_last_updates(interval=nSec)
@@ -195,7 +192,7 @@ def runBackEnd():
 
             rcdRep.setLastO2ORun(lastO2ORun, runO2OAge, statusForRpt)
         else:
-            print "Error: No O2O job logs for tag: " + tagName + " in account: " + accountName + " could be found in the PopConLogs"
+            print "Error: No O2O job logs for tag: " + tagName + " could be found in the PopConLogs"
             if 2051 > retValues[0]:
                 retValues = 2051, "Error: no O2O job logs found for rcd: " + recordName
 
@@ -204,7 +201,7 @@ def runBackEnd():
         # 1. get the last updates from PopConLogger
         # FIXME: the auth.xml can it be read from a central place?
         logData = popLog.PopConRecentActivityRecorded(authfile=passwdfile + "/authentication.xml",
-                                                      account=accountName,
+                                                      account='CMS_CONDITIONS',
                                                       iovtag=tagName)
 
         
@@ -244,13 +241,12 @@ def runBackEnd():
 
             
         # 2. check the status of the tag
-        outputAndStatus = gtTools.listIov(entry.getOraclePfn(False), tagName, passwdfile)
-        iovtable = gtTools.IOVTable()
-        iovtable.setFromListIOV(outputAndStatus[1])
-        datesince = iovtable.lastIOV().sinceDate()
+        #FIXME: handle the connection string correctly
+        iovtable = dbTools.getIOVTag_CondDBV2('pro', tagName, passwdfile)
+        datesince = iovtable.lastIOV.since
         sinceage = today - datesince
         print "  - Last IOV since:", datesince, "(" + str(sinceage),"ago)"
-        print "    with token: [" + iovtable.lastIOV().token() +"]"#.split("][")[4]
+        print "    with token: [" + iovtable.lastIOV.payloadHash +"]"#.split("][")[4]
         recordandlastsince[recordName] = datesince
         #print iovtable.lastIOV()
         stat = "OK"
