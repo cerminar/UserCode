@@ -17,6 +17,7 @@
    git clone g-usercode AlCaMonitoring_74X_v0
    git checkout AlCaMonitoring_74X_v0
    ln -s Alca/GT_branches/ .
+   scram b -j 4
    ```
    
    * edit the configuration file to point to your AFS based web area:
@@ -28,5 +29,11 @@
    taskName               = O2OMonitor-dev
    ....
    webArea                = /afs/cern.ch/user/<m>/<myusername>/www/Monitoring-dev/PCLO2O/
+   ```
+   
+   * run the application:
+  
+   ```
+   o2oMonitor.py
    ```
    
