@@ -13,8 +13,10 @@
    * clone this repo and setup the area
    
    ```
+   git init
    git remote add g-usercode git@github.com:cerminar/UserCode.git
-   git clone g-usercode AlCaMonitoring_74X_v0
+   git checkout g-usercode/AlCaMonitoring_74X_v0
+   git branch AlCaMonitoring_74X_v0
    git checkout AlCaMonitoring_74X_v0
    ln -s Alca/GT_branches/ .
    scram b -j 4
