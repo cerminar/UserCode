@@ -15,6 +15,7 @@
    ```
    git init
    git remote add g-usercode git@github.com:cerminar/UserCode.git
+   git fetch g-usercode
    git checkout g-usercode/AlCaMonitoring_74X_v0
    git branch AlCaMonitoring_74X_v0
    git checkout AlCaMonitoring_74X_v0
